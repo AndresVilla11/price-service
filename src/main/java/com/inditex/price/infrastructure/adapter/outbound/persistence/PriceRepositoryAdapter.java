@@ -1,30 +1,28 @@
 package com.inditex.price.infrastructure.adapter.outbound.persistence;
 
-import com.inditex.price.domain.model.Price;
-import com.inditex.price.domain.model.PriceQuery;
+import com.inditex.price.domain.model.PriceDto;
 import com.inditex.price.domain.port.outbound.PriceRepositoryPort;
-import com.inditex.price.infrastructure.adapter.outbound.persistence.mapper.EntityMapper;
+import com.inditex.price.infrastructure.adapter.outbound.persistence.mapper.PriceMapper;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Repository
-public final class PriceRepositoryAdapter implements PriceRepositoryPort {
+public class PriceRepositoryAdapter implements PriceRepositoryPort {
 
     private final PriceJpaRepository priceJpaRepository;
-    private final EntityMapper entityMapper;
+    private final PriceMapper priceMapper;
 
-    public PriceRepositoryAdapter(PriceJpaRepository priceJpaRepository, EntityMapper entityMapper) {
+    public PriceRepositoryAdapter(PriceJpaRepository priceJpaRepository, PriceMapper priceMapper) {
         this.priceJpaRepository = priceJpaRepository;
-        this.entityMapper = entityMapper;
+        this.priceMapper = priceMapper;
     }
 
     @Override
-    public Optional<Price> findApplicablePrice(PriceQuery query) {
-        return priceJpaRepository.findTopByCriteria(
-                        query.productId(),
-                        query.brandId(),
-                        query.applicationDate())
-                .map(entityMapper::toDomain);
+    public Optional<PriceDto> findApplicablePrice(Long productId, Long brandId, LocalDateTime applicationDate) {
+        priceJpaRepository.findTopByCriteria(productId, brandId, applicationDate)
+                .map(priceMapper::toDomain);
+        return Optional.empty();
     }
 }
