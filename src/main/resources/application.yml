@@ -8,6 +8,8 @@ server:
 spring:
   application:
     name: price-service
+  aop:
+    proxy-target-class: false
   threads:
     virtual:
       enabled: true
