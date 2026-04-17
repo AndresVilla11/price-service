@@ -1,6 +1,6 @@
 plugins {
 	java
-	id("org.springframework.boot") version "4.0.5"
+	id("org.springframework.boot") version "3.5.13"
 	id("io.spring.dependency-management") version "1.1.7"
 }
 
@@ -9,7 +9,7 @@ version = "1.0.0"
 
 java {
 	toolchain {
-		languageVersion = JavaLanguageVersion.of(25)
+		languageVersion = JavaLanguageVersion.of(21)
 	}
 }
 
@@ -20,9 +20,8 @@ repositories {
 dependencies {
 	implementation("org.springframework.boot:spring-boot-starter-actuator")
 	implementation("org.springframework.boot:spring-boot-starter-data-jpa")
-	implementation("org.springframework.boot:spring-boot-starter-webclient")
-	implementation("org.springframework.boot:spring-boot-starter-webmvc")
-	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:3.0.2")
+	implementation("org.springdoc:springdoc-openapi-starter-webmvc-ui:2.8.17")
+	implementation("org.springframework.boot:spring-boot-starter-web")
 
 	compileOnly("org.projectlombok:lombok")
 	annotationProcessor("org.projectlombok:lombok")
@@ -35,10 +34,6 @@ dependencies {
 	runtimeOnly("com.h2database:h2")
 	implementation("org.flywaydb:flyway-core")
 
-	testImplementation("org.springframework.boot:spring-boot-starter-actuator-test")
-	testImplementation("org.springframework.boot:spring-boot-starter-data-jpa-test")
-	testImplementation("org.springframework.boot:spring-boot-starter-webclient-test")
-	testImplementation("org.springframework.boot:spring-boot-starter-webmvc-test")
 	testCompileOnly("org.projectlombok:lombok")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 	testAnnotationProcessor("org.projectlombok:lombok")
