@@ -1,9 +1,10 @@
 package com.inditex.price.application.usecase;
 
+import com.inditex.price.domain.exception.PriceNotFoundException;
+import com.inditex.price.domain.model.Price;
+import com.inditex.price.domain.model.PriceQuery;
 import com.inditex.price.domain.port.inbound.GetApplicablePricePort;
 import com.inditex.price.domain.port.outbound.PriceRepositoryPort;
-import com.inditex.price.infrastructure.adapter.inbound.rest.dto.PriceRequest;
-import com.inditex.price.infrastructure.adapter.inbound.rest.dto.PriceResponse;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,7 +17,10 @@ public class GetApplicablePriceUseCase implements GetApplicablePricePort {
     }
 
     @Override
-    public PriceResponse execute(PriceRequest request) {
-        return null;
+    public Price execute(PriceQuery query) {
+        return priceRepositoryPort.findApplicablePrice(query)
+                .orElseThrow(() -> new PriceNotFoundException(
+                        query.productId(), query.brandId(), query.applicationDate()
+                ));
     }
 }
