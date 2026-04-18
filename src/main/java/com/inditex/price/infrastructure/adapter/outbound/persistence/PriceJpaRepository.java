@@ -13,8 +13,9 @@ public interface PriceJpaRepository extends JpaRepository<PriceEntity, Long> {
     @Query("""
                 SELECT p FROM PriceEntity p
                 WHERE p.productId = :productId
-                  AND p.brandId = :brandId
-                  AND :date BETWEEN p.startDate AND p.endDate
+                  AND p.brandId   = :brandId
+                  AND p.startDate <= :date
+                  AND p.endDate   >= :date
                 ORDER BY p.priority DESC
                 LIMIT 1
             """)
