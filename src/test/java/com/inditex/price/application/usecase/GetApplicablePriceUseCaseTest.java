@@ -28,16 +28,14 @@ import static org.mockito.Mockito.when;
 @DisplayName("GetApplicablePriceUseCase")
 class GetApplicablePriceUseCaseTest {
 
-    @Mock
-    PriceRepositoryPort priceRepositoryPort;
-
-    @InjectMocks
-    private GetApplicablePriceUseCase useCase;
-
     private static final Integer PRODUCT_ID = 35455;
     private static final Integer BRAND_ID = 1;
     private static final LocalDateTime APPLICATION_DATE =
             LocalDateTime.of(2020, 6, 14, 10, 0, 0);
+    @Mock
+    PriceRepositoryPort priceRepositoryPort;
+    @InjectMocks
+    private GetApplicablePriceUseCase useCase;
 
     private PriceQuery buildQuery() {
         return new PriceQuery(PRODUCT_ID, BRAND_ID, APPLICATION_DATE);

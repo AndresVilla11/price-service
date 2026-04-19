@@ -1,153 +1,210 @@
 # price-service
 
-Microservice responsible for resolving the applicable price for a product within a brand, given an application date. When multiple price lists overlap in time, the one with the highest **priority** value is returned.
+[![Java](https://img.shields.io/badge/Java-21-blue?logo=openjdk)](https://openjdk.org/projects/jdk/21/)
+[![Spring Boot](https://img.shields.io/badge/Spring_Boot-3.5-brightgreen?logo=springboot)](https://spring.io/projects/spring-boot)
+[![Build](https://img.shields.io/badge/Build-Gradle-blue?logo=gradle)](https://gradle.org/)
+[![Architecture](https://img.shields.io/badge/Architecture-Hexagonal-blueviolet)]()
+[![License](https://img.shields.io/badge/License-MIT-lightgrey)]()
+
+Microservicio Spring Boot que resuelve el **precio aplicable** para un producto dentro de una cadena, dada una fecha de consulta. Cuando múltiples tarifas se solapan en el tiempo, se aplica la de **mayor prioridad**.
 
 ---
 
-## Table of Contents
+## Tabla de Contenidos
 
-- [Architecture](#architecture)
-- [Technology Stack](#technology-stack)
-- [Getting Started](#getting-started)
+- [Arquitectura](#arquitectura)
+- [Stack Tecnológico](#stack-tecnológico)
+- [Prerequisitos](#prerequisitos)
+- [Levantar el servicio](#levantar-el-servicio)
+- [Docker](#docker)
 - [API Reference](#api-reference)
-- [Business Rules](#business-rules)
-- [Configuration](#configuration)
-- [Running Tests](#running-tests)
-- [Design Decisions](#design-decisions)
+- [Reglas de Negocio](#reglas-de-negocio)
+- [Base de Datos](#base-de-datos)
+- [Configuración](#configuración)
+- [Tests](#tests)
+- [Decisiones de Diseño](#decisiones-de-diseño)
+- [Actuator](#actuator)
 
 ---
 
-## Architecture
+## Arquitectura
 
-This service follows **Hexagonal Architecture** (Ports & Adapters), ensuring the domain is completely isolated from infrastructure concerns.
+El servicio sigue **Arquitectura Hexagonal** (Ports & Adapters). El dominio es completamente agnóstico a Spring, JPA y HTTP. Los adaptadores dependen del dominio; el dominio nunca depende de los adaptadores.
 
 ```
 com.inditex.price
-├── domain/                     # Pure business logic — zero external dependencies
+│
+├── domain/                              ← Núcleo — cero dependencias externas
 │   ├── model/
-│   │   ├── Price.java          # Domain model (Java 21 record)
-│   │   └── PriceQuery.java     # Value object encapsulating query criteria
+│   │   ├── Price.java                   # Modelo de dominio (Java record)
+│   │   └── PriceQuery.java              # Value object con los criterios de búsqueda
 │   ├── port/
-│   │   ├── input/
-│   │   │   └── GetApplicablePriceUseCase.java
-│   │   └── output/
-│   │       └── PriceRepositoryPort.java
-│   ├── service/
-│   │   └── GetApplicablePriceUseCaseImpl.java
+│   │   ├── inbound/
+│   │   │   └── GetApplicablePricePort.java   # Puerto de entrada (driven)
+│   │   └── outbound/
+│   │       └── PriceRepositoryPort.java      # Puerto de salida (driving)
 │   └── exception/
 │       └── PriceNotFoundException.java
 │
-├── application/                # Use case orchestration
+├── application/                         ← Orquestación de casos de uso
 │   └── usecase/
-│       └── GetApplicablePriceUseCaseImpl.java
+│       └── GetApplicablePriceUseCase.java
 │
-└── infrastructure/             # Adapters — all external concerns
+└── infrastructure/                      ← Adaptadores — todo lo externo
     ├── adapter/
-    │   ├── input/rest/         # HTTP adapter (Spring MVC)
-    │   │   ├── PriceController.java
-    │   │   ├── dto/            # PriceRequest, PriceResponse
-    │   │   └── mapper/         # PriceMapper (MapStruct)
-    │   └── output/persistence/ # JPA adapter
-    │       ├── PriceRepositoryAdapter.java
-    │       ├── entity/         # PriceEntity (@Entity)
-    │       └── mapper/         # EntityMapper (MapStruct)
+    │   ├── inbound/
+    │   │   └── rest/
+    │   │       ├── PriceController.java
+    │   │       ├── dto/                 # PriceRequest, PriceResponse (records)
+    │   │       └── mapper/              # PriceMapper (MapStruct)
+    │   ├── outbound/
+    │   │   └── persistence/
+    │   │       ├── PriceJpaRepository.java
+    │   │       ├── PriceRepositoryAdapter.java
+    │   │       ├── entity/              # PriceEntity (@Entity)
+    │   │       └── mapper/              # EntityMapper (MapStruct)
+    │   └── exception/
+    │       └── GlobalExceptionHandler.java  # @RestControllerAdvice + RFC 7807
     └── config/
         ├── OpenApiConfig.java
-        ├── aop/LoggingAspect.java
-        └── exception/GlobalExceptionHandler.java
+        └── LoggingAspect.java           # AOP — logging transversal
 ```
 
-### Dependency rule
-
-Dependencies flow strictly inward. The domain knows nothing about Spring, JPA, or HTTP. Adapters depend on ports; ports never depend on adapters.
+### Flujo de dependencias
 
 ```
-REST Controller → UseCase (port) → Domain Service → RepositoryPort (interface)
-                                                             ↑
-                                               JPA Adapter implements this
+HTTP Request
+    │
+    ▼
+PriceController          (adapter inbound)
+    │  usa puerto
+    ▼
+GetApplicablePricePort   (inbound port — interfaz de dominio)
+    │  implementado por
+    ▼
+GetApplicablePriceUseCase  (application layer)
+    │  usa puerto
+    ▼
+PriceRepositoryPort      (outbound port — interfaz de dominio)
+    │  implementado por
+    ▼
+PriceRepositoryAdapter   (adapter outbound → JPA → H2)
 ```
 
 ---
 
-## Technology Stack
+## Stack Tecnológico
 
-| Component        | Technology                      | Version  |
-|------------------|---------------------------------|----------|
-| Language         | Java                            | 21       |
-| Framework        | Spring Boot                     | 3.3.x    |
-| Persistence      | Spring Data JPA + H2            | —        |
-| Mapping          | MapStruct                       | 1.5.x    |
-| Documentation    | SpringDoc OpenAPI               | 2.x      |
-| Testing          | JUnit 5 + Mockito + MockMvc     | —        |
-| Build            | Maven                           | 3.9.x    |
+| Componente       | Tecnología                         | Versión   |
+|------------------|------------------------------------|-----------|
+| Lenguaje         | Java                               | 21        |
+| Framework        | Spring Boot                        | 3.5.x     |
+| Persistencia     | Spring Data JPA + H2 (in-memory)   | —         |
+| Migraciones DB   | Flyway                             | —         |
+| Mapeo            | MapStruct                          | 1.6.3     |
+| Boilerplate      | Lombok                             | —         |
+| Documentación    | SpringDoc OpenAPI (Swagger UI)     | 2.8.x     |
+| Observabilidad   | Spring Actuator + AOP Logging      | —         |
+| Testing          | JUnit 5 + Mockito + MockMvc        | —         |
+| Build            | Gradle (Kotlin DSL)                | —         |
+| Contenedor       | Docker (multi-stage, Alpine)       | —         |
 
 ---
 
-## Getting Started
+## Prerequisitos
 
-### Prerequisites
+- **Java 21** (JDK)
+- **Gradle** (o usar el wrapper incluido `./gradlew`)
+- **Docker** (opcional, para ejecución en contenedor)
 
-- Java 21
-- Maven 3.9+
+---
 
-### Build and run
+## Levantar el servicio
 
-```bash
-./mvnw clean package
-./mvnw spring-boot:run
-```
-
-### Run with dev profile (H2 console + verbose SQL logging)
+### Compilar y ejecutar localmente
 
 ```bash
-./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+# Clonar el repositorio
+git clone https://github.com/AndresVilla11/price-service.git
+cd price-service
+
+# Ejecutar (el wrapper de Gradle descarga todo automáticamente)
+./gradlew bootRun
 ```
 
-The H2 console is available at `http://localhost:8080/h2-console` in the `dev` profile only.  
-JDBC URL: `jdbc:h2:mem:pricedb`
+El servicio arranca en `http://localhost:8080`.
 
-### API documentation
+### Compilar el JAR
 
-Once running, the OpenAPI UI is available at:
+```bash
+./gradlew bootJar
+java -jar build/libs/price-service.jar
+```
+
+### Herramientas disponibles en local
+
+| Herramienta      | URL                                      |
+|------------------|------------------------------------------|
+| Swagger UI       | http://localhost:8080/swagger-ui/index.html |
+| OpenAPI JSON     | http://localhost:8080/v3/api-docs        |
+| H2 Console       | http://localhost:8080/h2-console         |
+| Health check     | http://localhost:8080/actuator/health    |
+
+> **H2 Console** — JDBC URL: `jdbc:h2:mem:pricing-db` · Usuario: `sa` · Contraseña: _(vacía)_
+
+---
+
+## Docker
+
+El proyecto incluye un `Dockerfile` **multi-stage** optimizado con capas de Spring Boot y usuario no-root.
+
+```bash
+# Construir la imagen
+docker build -t price-service:latest .
+
+# Ejecutar
+docker run -p 8080:8080 price-service:latest
+```
+
+### Parámetros de JVM configurados en contenedor
 
 ```
-http://localhost:8080/swagger-ui.html
-http://localhost:8080/api-docs           (raw JSON)
+-XX:+UseContainerSupport
+-XX:MaxRAMPercentage=75.0
+-Djava.security.egd=file:/dev/./urandom
 ```
 
 ---
 
 ## API Reference
 
-### `GET /api/v1/prices`
+### `GET /prices`
 
-Returns the applicable price for a product given a brand and application date.
+Devuelve el precio aplicable para un producto, cadena y fecha dados.
 
-#### Query parameters
+#### Parámetros de entrada
 
-| Parameter         | Type              | Required | Description                          |
-|-------------------|-------------------|----------|--------------------------------------|
-| `productId`       | `Long`            | Yes      | Product identifier                   |
-| `brandId`         | `Long`            | Yes      | Brand identifier (1 = ZARA)          |
-| `applicationDate` | `LocalDateTime`   | Yes      | ISO 8601 date-time (e.g. `2020-06-14T10:00:00`) |
+| Parámetro         | Tipo            | Obligatorio | Descripción                                         |
+|-------------------|-----------------|-------------|-----------------------------------------------------|
+| `productId`       | `Integer`       | ✅          | Identificador del producto (ej. `35455`)            |
+| `brandId`         | `Integer`       | ✅          | Identificador de la cadena (`1` = ZARA)             |
+| `applicationDate` | `LocalDateTime` | ✅          | Fecha de consulta en ISO 8601 (ej. `2020-06-14T10:00:00`) |
 
-#### Responses
+#### Respuestas
 
-| Status | Description                                      |
-|--------|--------------------------------------------------|
-| `200`  | Applicable price found                           |
-| `400`  | Invalid or missing request parameters            |
-| `404`  | No applicable price for the given criteria       |
-| `500`  | Unexpected server error                          |
+| Código | Descripción                                         |
+|--------|-----------------------------------------------------|
+| `200`  | Precio aplicable encontrado                         |
+| `400`  | Parámetros inválidos o ausentes                     |
+| `404`  | No existe precio aplicable para los criterios dados |
+| `500`  | Error interno inesperado                            |
 
-#### Example request
+#### Ejemplo — 200 OK
 
 ```bash
-curl -X GET "http://localhost:8080/api/v1/prices?productId=35455&brandId=1&applicationDate=2020-06-14T10:00:00" \
+curl -X GET "http://localhost:8080/prices?productId=35455&brandId=1&applicationDate=2020-06-14T10:00:00" \
      -H "Accept: application/json"
 ```
-
-#### Example response — 200 OK
 
 ```json
 {
@@ -161,7 +218,7 @@ curl -X GET "http://localhost:8080/api/v1/prices?productId=35455&brandId=1&appli
 }
 ```
 
-#### Example response — 404 Not Found (RFC 7807)
+#### Ejemplo — 404 Not Found (RFC 7807 / ProblemDetail)
 
 ```json
 {
@@ -170,18 +227,20 @@ curl -X GET "http://localhost:8080/api/v1/prices?productId=35455&brandId=1&appli
   "status":    404,
   "detail":    "No applicable price found for productId=35455, brandId=1, date=2020-06-14T10:00",
   "timestamp": "2024-01-15T10:23:45.123Z",
-  "path":      "/api/v1/prices"
+  "path":      "/prices"
 }
 ```
 
-#### Example response — 400 Bad Request (RFC 7807)
+#### Ejemplo — 400 Bad Request
 
 ```json
 {
-  "type":   "https://api.inditex.com/errors/validation-error",
-  "title":  "Invalid Request",
-  "status": 400,
-  "detail": "Request validation failed",
+  "type":       "https://api.inditex.com/errors/validation-error",
+  "title":      "Invalid Request",
+  "status":     400,
+  "detail":     "Request validation failed",
+  "timestamp":  "2024-01-15T10:23:45.123Z",
+  "path":       "/prices",
   "violations": {
     "productId": "must be greater than 0"
   }
@@ -190,103 +249,151 @@ curl -X GET "http://localhost:8080/api/v1/prices?productId=35455&brandId=1&appli
 
 ---
 
-## Business Rules
+## Reglas de Negocio
 
-The `PRICES` table stores price ranges per product and brand with overlapping time windows.
+La tabla `PRICES` almacena rangos de precios por producto y cadena con ventanas temporales que pueden solaparse.
 
-| Field        | Description                                                             |
-|--------------|-------------------------------------------------------------------------|
-| `BRAND_ID`   | Brand foreign key (1 = ZARA)                                            |
-| `START_DATE` | Range start — inclusive                                                  |
-| `END_DATE`   | Range end — inclusive                                                    |
-| `PRICE_LIST` | Price list identifier                                                    |
-| `PRODUCT_ID` | Product identifier                                                       |
-| `PRIORITY`   | Disambiguation: when ranges overlap, the highest priority value wins     |
-| `PRICE`      | Final applicable price                                                   |
-| `CURR`       | ISO 4217 currency code                                                   |
+| Campo        | Descripción                                                                  |
+|--------------|------------------------------------------------------------------------------|
+| `BRAND_ID`   | Foreign key de la cadena (`1` = ZARA)                                        |
+| `START_DATE` | Inicio del rango de validez — inclusivo                                      |
+| `END_DATE`   | Fin del rango de validez — inclusivo                                         |
+| `PRICE_LIST` | Identificador de la tarifa aplicable                                         |
+| `PRODUCT_ID` | Identificador del producto                                                   |
+| `PRIORITY`   | Desambiguador: cuando dos tarifas se solapan, gana la de mayor valor numérico |
+| `PRICE`      | Precio final de venta                                                        |
+| `CURR`       | Código de moneda ISO 4217                                                    |
 
-### Priority resolution
+### Resolución de prioridad
 
-Priority is resolved at the database level via `ORDER BY priority DESC LIMIT 1`. This avoids fetching multiple rows and filtering in application memory, keeping the query O(log n) with a proper composite index on `(product_id, brand_id, start_date, end_date)`.
-
-### Seed data
-
-The service initializes with the following dataset on startup:
-
-| brandId | startDate           | endDate             | priceList | productId | priority | price | currency |
-|---------|---------------------|---------------------|-----------|-----------|----------|-------|----------|
-| 1       | 2020-06-14 00:00:00 | 2020-12-31 23:59:59 | 1         | 35455     | 0        | 35.50 | EUR      |
-| 1       | 2020-06-14 15:00:00 | 2020-06-14 18:30:00 | 2         | 35455     | 1        | 25.45 | EUR      |
-| 1       | 2020-06-15 00:00:00 | 2020-06-15 11:00:00 | 3         | 35455     | 1        | 30.50 | EUR      |
-| 1       | 2020-06-15 16:00:00 | 2020-12-31 23:59:59 | 4         | 35455     | 1        | 38.95 | EUR      |
+La resolución se delega completamente a la base de datos mediante una query JPQL con `ORDER BY priority DESC LIMIT 1`. Esto evita traer múltiples filas a la aplicación y hace el intent explícito a nivel de consulta, con complejidad O(log n) gracias al índice compuesto.
 
 ---
 
-## Configuration
+## Base de Datos
 
-| Property                              | Default                        | Description                             |
-|---------------------------------------|--------------------------------|-----------------------------------------|
-| `server.port`                         | `8080`                         | HTTP server port                        |
-| `spring.jpa.open-in-view`             | `false`                        | Disabled to avoid lazy-load anti-pattern|
-| `spring.jpa.hibernate.ddl-auto`       | `none`                         | Schema managed by `schema.sql`          |
-| `spring.mvc.problemdetails.enabled`   | `true`                         | RFC 7807 error format                   |
-| `springdoc.swagger-ui.path`           | `/swagger-ui.html`             | OpenAPI UI path                         |
-| `management.endpoints.web.exposure`   | `health, info, metrics`        | Actuator endpoints                      |
+### Esquema (`V1__create_prices_table.sql`)
 
-Sensitive overrides (datasource credentials, ports) should be provided via environment variables in non-local environments, never committed to source control.
+Gestionado mediante **Flyway** (versionado y reproducible).
 
----
+```sql
+CREATE TABLE PRICES (
+    ID         BIGINT AUTO_INCREMENT PRIMARY KEY,
+    BRAND_ID   INT            NOT NULL,
+    PRODUCT_ID INT            NOT NULL,
+    PRICE_LIST INT            NOT NULL,
+    PRIORITY   INT            NOT NULL,
+    START_DATE TIMESTAMP      NOT NULL,
+    END_DATE   TIMESTAMP      NOT NULL,
+    PRICE      DECIMAL(10, 2) NOT NULL,
+    CURR       VARCHAR(3)     NOT NULL,
 
-## Running Tests
+    CONSTRAINT CHK_PRICE_POSITIVE CHECK (PRICE >= 0),
+    CONSTRAINT CHK_DATE_RANGE     CHECK (END_DATE >= START_DATE)
+);
 
-```bash
-# All tests
-./mvnw test
-
-# Only integration tests
-./mvnw test -Dtest=PriceControllerIntegrationTest
-
-# With coverage report (target/site/jacoco/index.html)
-./mvnw verify
+-- Índice compuesto para la consulta de lookup (cubre el WHERE y el ORDER BY)
+CREATE INDEX IDX_PRICES_LOOKUP ON PRICES (PRODUCT_ID, BRAND_ID, START_DATE, END_DATE, PRIORITY);
+CREATE INDEX IDX_PRICES_DATES  ON PRICES (START_DATE, END_DATE);
 ```
 
-### Test scenarios covered
+### Datos iniciales (`V2__insert_prices.sql`)
 
-The five required scenarios are validated via `@ParameterizedTest`:
-
-| # | Date              | Expected priceList | Expected price |
-|---|-------------------|--------------------|----------------|
-| 1 | 2020-06-14 10:00  | 1                  | 35.50          |
-| 2 | 2020-06-14 16:00  | 2                  | 25.45          |
-| 3 | 2020-06-14 21:00  | 1                  | 35.50          |
-| 4 | 2020-06-15 10:00  | 3                  | 30.50          |
-| 5 | 2020-06-16 21:00  | 4                  | 38.95          |
+| BRAND_ID | START_DATE          | END_DATE            | PRICE_LIST | PRODUCT_ID | PRIORITY | PRICE | CURR |
+|----------|---------------------|---------------------|------------|------------|----------|-------|------|
+| 1        | 2020-06-14 00:00:00 | 2020-12-31 23:59:59 | 1          | 35455      | 0        | 35.50 | EUR  |
+| 1        | 2020-06-14 15:00:00 | 2020-06-14 18:30:00 | 2          | 35455      | 1        | 25.45 | EUR  |
+| 1        | 2020-06-15 00:00:00 | 2020-06-15 11:00:00 | 3          | 35455      | 1        | 30.50 | EUR  |
+| 1        | 2020-06-15 16:00:00 | 2020-12-31 23:59:59 | 4          | 35455      | 1        | 38.95 | EUR  |
 
 ---
 
-## Design Decisions
+## Configuración
 
-**Why Hexagonal Architecture?**  
-The domain is completely decoupled from Spring, JPA, and HTTP. Replacing H2 with PostgreSQL, or REST with GraphQL, requires touching only the infrastructure adapters — not a single line of business logic.
+Propiedades relevantes del `application.yml`:
 
-**Why resolve priority in the database?**  
-Fetching a single row with `ORDER BY priority DESC LIMIT 1` is more efficient than loading all candidates and filtering in Java. It also makes the intent explicit at the query level.
+| Propiedad                              | Valor por defecto             | Descripción                                    |
+|----------------------------------------|-------------------------------|------------------------------------------------|
+| `server.port`                          | `8080`                        | Puerto HTTP                                    |
+| `server.shutdown`                      | `graceful`                    | Apagado graceful (drena requests en vuelo)     |
+| `spring.threads.virtual.enabled`       | `true`                        | Virtual threads (Project Loom — Java 21)       |
+| `spring.jpa.open-in-view`             | `false`                       | Deshabilitado para evitar lazy-load fuera de TX|
+| `spring.jpa.hibernate.ddl-auto`       | `validate`                    | Schema gestionado por Flyway                   |
+| `spring.flyway.enabled`               | `true`                        | Migraciones activas en arranque                |
+| `management.endpoints.web.exposure`   | `health, info, metrics`       | Endpoints de Actuator expuestos                |
 
-**Why `PriceNotFoundException` as a `RuntimeException`?**  
-The caller (use case) is not expected to handle this — it represents a business rule violation that the HTTP layer converts to a 404. Checked exceptions would pollute every layer of the call stack.
-
-**Why `open-in-view: false`?**  
-The default `true` keeps the JPA session open for the entire HTTP request lifecycle, which can cause unintended lazy-loading outside a transactional context and connection pool exhaustion under load.
-
-**Why Java 21 Records for DTOs and value objects?**  
-Records provide immutability, structural equality, and `toString()` out of the box with zero boilerplate. `PriceQuery` and `Price` as records make accidental mutation impossible.
+> En entornos no locales, las credenciales y URLs del datasource deben proveerse como variables de entorno, nunca commiteadas.
 
 ---
 
-## Actuator endpoints
+## Tests
 
-| Endpoint              | Description            |
-|-----------------------|------------------------|
-| `GET /actuator/health`  | Service health check   |
-| `GET /actuator/info`    | Application metadata   |
-| `GET /actuator/metrics` | Runtime metrics        |
+### Ejecutar todos los tests
+
+```bash
+./gradlew test
+```
+
+### Estructura de tests
+
+El proyecto cuenta con tres niveles de testing:
+
+#### Tests Unitarios
+
+- `GetApplicablePriceUseCaseTest` — Verifica la lógica del use case de forma aislada con Mockito.
+- `PriceRepositoryAdapterTest` — Verifica el adaptador de persistencia en forma unitaria.
+
+#### Tests de Integración
+
+- `PriceControllerIntegrationTest` — Levanta solo la capa web (`@WebMvcTest`) y mockea el puerto de entrada.
+- `PriceRepositoryAdapterIntegrationTest` — Verifica la query JPA contra H2 real (`@DataJpaTest`).
+
+#### Tests de Sistema (End-to-End)
+
+- `PriceSystemTest` — Carga el contexto completo de Spring Boot (`@SpringBootTest`) con MockMvc y H2 real, cubriendo los 5 escenarios requeridos:
+
+| Test | Fecha consulta        | Tarifa esperada | Precio esperado |
+|------|-----------------------|-----------------|-----------------|
+| 1    | 2020-06-14 10:00:00   | 1               | 35.50 €         |
+| 2    | 2020-06-14 16:00:00   | 2               | 25.45 €         |
+| 3    | 2020-06-14 21:00:00   | 1               | 35.50 €         |
+| 4    | 2020-06-15 10:00:00   | 3               | 30.50 €         |
+| 5    | 2020-06-16 21:00:00   | 4               | 38.95 €         |
+
+---
+
+## Decisiones de Diseño
+
+**¿Por qué Arquitectura Hexagonal?**  
+El dominio es completamente intercambiable. Reemplazar H2 por PostgreSQL, o REST por gRPC, requiere tocar únicamente los adaptadores de infraestructura — ni una sola línea de lógica de negocio.
+
+**¿Por qué resolver prioridad en la base de datos?**  
+`ORDER BY priority DESC LIMIT 1` trae una única fila y hace el intent explícito en la query. Traer todos los candidatos y filtrar en Java sería ineficiente y desplazaría la lógica fuera de su capa natural.
+
+**¿Por qué Java 21 Records para DTOs y modelos de dominio?**  
+Los records proveen inmutabilidad, igualdad estructural y `toString()` sin boilerplate. `Price`, `PriceQuery`, `PriceRequest` y `PriceResponse` como records hacen imposible la mutación accidental.
+
+**¿Por qué Virtual Threads (Project Loom)?**  
+Con `spring.threads.virtual.enabled=true` y `server.shutdown=graceful`, el servicio puede manejar alta concurrencia de I/O con overhead mínimo de hilos, alineado con las capacidades de Java 21.
+
+**¿Por qué `open-in-view: false`?**  
+El valor por defecto `true` mantiene la sesión JPA abierta durante todo el request HTTP, lo que puede causar lazy-loading no intencionado fuera de un contexto transaccional y agotamiento del connection pool bajo carga.
+
+**¿Por qué `PriceNotFoundException` es una `RuntimeException`?**  
+Representa una violación de regla de negocio que la capa HTTP convierte a un 404 mediante el `@RestControllerAdvice`. Las checked exceptions contaminarían cada capa del call stack innecesariamente.
+
+**¿Por qué RFC 7807 (`ProblemDetail`)?**  
+Estándar de la industria para respuestas de error HTTP estructuradas. Spring Boot 3.x lo soporta nativamente y proporciona un contrato claro para los consumidores de la API.
+
+**¿Por qué Flyway para migraciones?**  
+Garantiza reproducibilidad total del esquema en cualquier entorno (local, CI, producción). Cada cambio en el schema queda versionado, auditado y es reversible.
+
+---
+
+## Actuator
+
+| Endpoint                  | Descripción               |
+|---------------------------|---------------------------|
+| `GET /actuator/health`    | Estado de salud del servicio |
+| `GET /actuator/info`      | Metadata de la aplicación |
+| `GET /actuator/metrics`   | Métricas de runtime       |

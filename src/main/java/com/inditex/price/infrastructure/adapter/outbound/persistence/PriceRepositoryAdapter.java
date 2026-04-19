@@ -3,11 +3,9 @@ package com.inditex.price.infrastructure.adapter.outbound.persistence;
 import com.inditex.price.domain.model.Price;
 import com.inditex.price.domain.model.PriceQuery;
 import com.inditex.price.domain.port.outbound.PriceRepositoryPort;
-import com.inditex.price.infrastructure.adapter.outbound.persistence.entity.PriceEntity;
 import com.inditex.price.infrastructure.adapter.outbound.persistence.mapper.EntityMapper;
 import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
 @Repository
