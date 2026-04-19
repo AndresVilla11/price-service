@@ -155,5 +155,12 @@ class PriceControllerIntegrationTest {
                     .andExpect(status().isBadRequest())
                     .andExpect(jsonPath("$.violations.brandId").exists());
         }
+
+        @Test
+        void whenReturns500() throws Exception {
+            mockMvc.perform(get(URL + "/?productId=99999&brandId=1&applicationDate=2020-06-14T10:00:00")
+                            .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().is5xxServerError());
+        }
     }
 }

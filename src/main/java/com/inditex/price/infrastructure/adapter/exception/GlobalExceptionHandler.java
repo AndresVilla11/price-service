@@ -59,25 +59,6 @@ public class GlobalExceptionHandler {
         return detail;
     }
 
-    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-    public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex,
-                                            HttpServletRequest request) {
-        String detail = "Parameter '%s' must be of type %s"
-                .formatted(ex.getName(),
-                        Optional.ofNullable(ex.getRequiredType())
-                                .map(Class::getSimpleName)
-                                .orElse("unknown"));
-
-        log.warn("Type mismatch: {} — path={}", detail, request.getRequestURI());
-
-        ProblemDetail pd = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, detail);
-        pd.setTitle("Type Mismatch");
-        pd.setType(URI.create("https://api.inditex.com/errors/type-mismatch"));
-        pd.setProperty("timestamp", Instant.now());
-        pd.setProperty("path", request.getRequestURI());
-        return pd;
-    }
-
     @ExceptionHandler(Exception.class)
     public ProblemDetail handleGeneric(Exception ex, HttpServletRequest request) {
         log.error("Unexpected error — path={}", request.getRequestURI(), ex);
