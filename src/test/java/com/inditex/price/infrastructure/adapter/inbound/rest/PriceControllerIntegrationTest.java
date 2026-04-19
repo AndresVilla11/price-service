@@ -146,5 +146,14 @@ class PriceControllerIntegrationTest {
                             .accept(MediaType.APPLICATION_JSON))
                     .andExpect(status().isBadRequest());
         }
+
+
+        @Test
+        void whenNegativeBrandIdReturns400() throws Exception {
+            mockMvc.perform(get(URL + "?productId=35455&brandId=-1&applicationDate=2020-06-14T10:00:00")
+                            .accept(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.violations.brandId").exists());
+        }
     }
 }

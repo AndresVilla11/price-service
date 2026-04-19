@@ -14,7 +14,7 @@ public class ObjectMock {
     public static final LocalDateTime DATE_14_AT_10 = LocalDateTime.of(2020, 6, 14, 10, 0);
 
     public static PriceEntity buildEntity(int priceList, int priority, String price,
-                                    LocalDateTime start, LocalDateTime end) {
+                                          LocalDateTime start, LocalDateTime end) {
         return PriceEntity.builder()
                 .productId(35455)
                 .brandId(1)
@@ -28,7 +28,7 @@ public class ObjectMock {
     }
 
     public static Price buildDomain(int priceList, String price,
-                              LocalDateTime start, LocalDateTime end) {
+                                    LocalDateTime start, LocalDateTime end) {
         return new Price(35455, 1, priceList, start, end, new BigDecimal(price), "EUR");
     }
 

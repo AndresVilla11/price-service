@@ -2,17 +2,14 @@ package com.inditex.price.infrastructure.adapter.outbound.persistence;
 
 import com.inditex.price.domain.model.Price;
 import com.inditex.price.domain.model.PriceQuery;
-import com.inditex.price.infrastructure.adapter.outbound.persistence.mapper.EntityMapper;
 import com.inditex.price.infrastructure.adapter.outbound.persistence.mapper.EntityMapperImpl;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.jdbc.Sql;
 import org.springframework.transaction.annotation.Transactional;
 
